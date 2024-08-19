@@ -1,0 +1,70 @@
+{
+	"htmlWhitespaceSensitivity": "ignore",
+	"trailingComma": "none",
+	"tabWidth": 2,
+	"semi": false,
+
+	"plugins": ["@trivago/prettier-plugin-sort-imports"],
+
+	"importOrder": [
+		"^@sentry/(.*)$",
+		"^@grpc/(.*)$",
+
+		"^@nestjs/(.*)$",
+
+		"^typeorm",
+		"^express",
+		"^passport",
+
+		".factory",
+		".middleware",
+		".interceptor",
+		".filter",
+
+		".module",
+		".wrapper",
+		".provider",
+		"/providers",
+
+		".controller",
+		".service",
+
+		".export",
+		".constants",
+		"/constants",
+		".decorator",
+		"/decorators",
+		".helper",
+		"/helpers",
+		".validator",
+
+		".entity",
+		".dto",
+		".mock",
+		"/dto",
+		"/mocks",
+		"/entities",
+
+		".interfaces",
+		".interface",
+		"/interfaces",
+		".enum",
+		"/enums",
+		".types",
+		".type",
+		"/types",
+		"^@types/(.*)$",
+
+		"^[./]"
+	],
+
+	"importOrderGroupNamespaceSpecifiers": true,
+	"importOrderCaseInsensitive": true,
+	"importOrderSortSpecifiers": true,
+	"importOrderSeparation": true,
+	"importOrderParserPlugins": [
+		"decorators-legacy",
+		"classProperties",
+		"typescript"
+	]
+}

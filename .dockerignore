@@ -1,0 +1,30 @@
+# IDE deps
+.idea
+
+# app & platform env
+app.env
+platform.env
+.env
+
+# infrastructure deps
+env.d/charts.d
+env.d/docker.d
+env.d/dotenv.d
+env.d/mk.d
+env.d/ci.d
+docker-compose.yaml
+Makefile
+Dockerfile
+.dockerignore
+
+# development deps
+README.md
+.eslintrc.js
+.prettierrc
+node_modules/
+.npmrc
+.yarnrc.yml
+
+# git deps
+.git/
+.gitignore
