@@ -1,0 +1,191 @@
+secrets:
+  ca_certificate:
+    file: env.d/secrets.d/ca-cert.pem
+  server_certificate:
+    file: env.d/secrets.d/server-cert.pem
+  server_key:
+    file: env.d/secrets.d/server-key.pem
+
+services:
+  http_service:
+    build:
+      context: .
+      dockerfile: env.d/docker.d/Dockerfile
+      target: runtime-development
+      args:
+        NPM_REGISTRY__URL: "$NPM_REGISTRY__URL"
+        NPM_REGISTRY__TOKEN: "$NPM_REGISTRY__TOKEN"
+        SENTRY_RELEASE: "local"
+    container_name: "${COMPOSE_PROJECT_NAME}__http_gateway"
+    volumes:
+      - ./src:/opt/app/src
+      - ./test:/opt/app/test
+    env_file:
+      - app.env
+    environment:
+      RUN_MODE: "MODE_HTTP"
+    ports:
+      - "${PORT__APP_HTTP}:3000"
+    depends_on:
+      - db
+      - minio-service
+
+  grpc_service:
+    build:
+      context: .
+      dockerfile: env.d/docker.d/Dockerfile
+      target: runtime-development
+      args:
+        NPM_REGISTRY__URL: "$NPM_REGISTRY__URL"
+        NPM_REGISTRY__TOKEN: "$NPM_REGISTRY__TOKEN"
+        SENTRY_RELEASE: "local"
+    container_name: "${COMPOSE_PROJECT_NAME}__grpc_gateway"
+    volumes:
+      - ./src:/opt/app/src
+      - ./test:/opt/app/test
+    env_file:
+      - app.env
+    environment:
+      RUN_MODE: "MODE_GRPC"
+      CA_CERT_FILE: "/run/secrets/ca_certificate"
+      SERVER_CERT_FILE: "/run/secrets/server_certificate"
+      SERVER_KEY_FILE: "/run/secrets/server_key"
+      GRPC_VERBOSITY: "DEBUG"
+    secrets:
+      - ca_certificate
+      - server_certificate
+      - server_key
+    ports:
+      - "${PORT__APP_GRPC}:3000"
+    depends_on:
+      - db
+      - minio-service
+  db:
+    image: postgres
+    container_name: docs-backend-db
+    env_file:
+      - app.env
+    environment:
+      POSTGRES_DB: docs-backend-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+  kafka_service:
+    build:
+      context: .
+      dockerfile: env.d/docker.d/Dockerfile
+      target: runtime-development
+      args:
+        NPM_REGISTRY__URL: "$NPM_REGISTRY__URL"
+        NPM_REGISTRY__TOKEN: "$NPM_REGISTRY__TOKEN"
+        SENTRY_AUTH_TOKEN: "${SENTRY__AUTH_TOKEN}"
+        SENTRY_RELEASE: "local"
+    container_name: "${COMPOSE_PROJECT_NAME}__kafka_service"
+    volumes:
+      - ./src:/opt/app/src
+      - ./test:/opt/app/test
+    env_file:
+      - app.env
+    environment:
+      RUN_MODE: "MODE_KAFKA"
+      CA_CERT_FILE: "/run/secrets/ca_certificate"
+      SERVER_CERT_FILE: "/run/secrets/server_certificate"
+      SERVER_KEY_FILE: "/run/secrets/server_key"
+    secrets:
+      - ca_certificate
+      - server_certificate
+      - server_key
+  worker_service:
+    build:
+      context: .
+      dockerfile: env.d/docker.d/Dockerfile
+      target: runtime-development
+      args:
+        NPM_REGISTRY__URL: "$NPM_REGISTRY__URL"
+        NPM_REGISTRY__TOKEN: "$NPM_REGISTRY__TOKEN"
+        SENTRY_AUTH_TOKEN: "${SENTRY__AUTH_TOKEN}"
+        SENTRY_RELEASE: "local"
+    container_name: "${COMPOSE_PROJECT_NAME}__worker"
+    volumes:
+      - ./src:/opt/app/src
+      - ./test:/opt/app/test
+    env_file:
+      - app.env
+    environment:
+      RUN_MODE: "MODE_WORKER"
+    ports:
+      - "${PORT__APP_WORKER}:3000"
+    depends_on:
+      - redis
+  minio-service:
+    image: minio/minio
+    container_name: minio-service
+    env_file:
+      - app.env
+    ports:
+      - 9000:9000
+      - 9099:9099
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ACCESS_KEY: ${MINIO_SERVER_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SERVER_SECRET_KEY}
+    command: server --address ":9099" --console-address ":9000" /data
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio-service
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add minio http://minio-service:9099 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc mb minio/media;
+      /usr/bin/mc policy set download minio/media;
+      /usr/bin/mc mb minio/logs;
+      /usr/bin/mc policy set download minio/logs;
+      exit 0;
+      "
+  redis:
+    image: redis:4
+    container_name: redis
+    ports:
+      - '6379:6379'
+    command: redis-server --requirepass redis
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.2.1
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+  kafka:
+    image: confluentinc/cp-server:7.2.1
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9997:9997"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9997
+      KAFKA_JMX_HOSTNAME: kafka
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8082:8080
+    environment:
+      DYNAMIC_CONFIG_ENABLED: true

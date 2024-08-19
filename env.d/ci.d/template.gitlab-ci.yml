@@ -1,0 +1,156 @@
+stages:
+  - prebuild
+  - build
+  - postbuild
+  - deploy
+  - postdeploy
+  - sonarqube
+
+variables:
+  REGISTRY_IMAGE: $REGISTRY_URL/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/$CI_COMMIT_BRANCH
+  DEPLOYMENT_APP: $CI_PROJECT_NAME
+  DEPLOYMENT_CONTAINER: $CI_PROJECT_NAME
+  DOCKER_TLS_CERTDIR: ""
+
+# Проверки безопасности
+.sonarqube.check: &sonarqube_check
+  stage: sonarqube
+  image:
+    entrypoint: [""]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+    GIT_DEPTH: "0"
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script:
+    - sonar-scanner
+  allow_failure: true
+  tags:
+    - lint
+    - docker
+
+# Основной пайплайн
+.prebuild:template: &prebuild_definition
+  stage: prebuild
+  script:
+    - echo "${SENTRY_PROJECT}@$(jq -r ".version" package.json)-${APP_ENV}-${CI_COMMIT_SHORT_SHA}" >> version.txt
+  artifacts:
+    paths:
+      - version.txt
+    expire_in: 10 minutes
+
+.build:template: &build_definition
+  stage: build
+  services:
+    - name: docker:dind
+      alias: docker
+  before_script:
+    - echo $REGISTRY_TOKEN | docker login $REGISTRY_URL -u $REGISTRY_USER --password-stdin
+  script:
+    - DOCKER_BUILDKIT=1
+      docker build
+      --target runtime-production
+      --build-arg NPM_REGISTRY__URL=$NPM_REGISTRY__URL
+      --build-arg NPM_REGISTRY__TOKEN=$NPM_REGISTRY__TOKEN
+      --build-arg APP_ENV=$APP_ENV
+      -t $REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+      -f env.d/docker.d/Dockerfile
+      .
+
+#      --build-arg SENTRY_VERSION=$(cat version.txt)
+    - docker push $REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker rmi $REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+.deploy:template: &deploy_definition
+  image: alpine/helm:3.11.1
+  stage: deploy
+  script:
+    - helm upgrade --install $CI_PROJECT_NAME ./env.d/charts.d
+      --namespace $K8S_NAMESPACE
+      --set image.repository=$REGISTRY_IMAGE
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+      -f ./env.d/charts.d/$HELM_VALUES.yaml
+  dependencies: []
+
+.rules:test:template: &rules_test_definition
+  rules:
+    - if: $CI_COMMIT_BRANCH == "testing"
+  tags:
+    - test
+  variables:
+    APP_ENV: test
+
+.rules:production:template: &rules_prod_definition
+  rules:
+    - if: $CI_COMMIT_BRANCH == "production"
+  variables:
+    APP_ENV: prod
+
+### testing
+sonarqube:check:testing:
+  <<: [*sonarqube_check, *rules_test_definition]
+  tags:
+    - docker
+    - lint
+prebuild:image:testing:
+  <<: [*prebuild_definition, *rules_test_definition]
+  tags:
+    - docker
+    - lint
+build:image:testing:
+  <<: [*build_definition, *rules_test_definition]
+  tags:
+    - docker
+    - build
+  dependencies:
+    - prebuild:image:testing
+
+
+deploy:image:testing:
+  <<: [*deploy_definition, *rules_test_definition]
+  variables:
+    K8S_NAMESPACE: docs-service-test
+    HELM_VALUES: test.values
+  environment:
+    name: test
+    url: https://test-docs-backend.docs.site/
+  tags:
+    - deploy
+    - k8s
+    - docs-cluster
+
+
+### production
+sonarqube:check:production:
+  <<: [*sonarqube_check, *rules_prod_definition]
+  tags:
+    - docker
+    - lint
+prebuild:image:production:
+  <<: [*prebuild_definition, *rules_prod_definition]
+  tags:
+    - docker
+    - lint
+build:image:production:
+  <<: [*build_definition, *rules_prod_definition]
+  tags:
+    - docker
+    - build
+  dependencies:
+    - prebuild:image:production
+
+
+deploy:image:production:
+  <<: [*deploy_definition, *rules_prod_definition]
+  variables:
+    K8S_NAMESPACE: docs-service-production
+    HELM_VALUES: prod.values
+  environment:
+    name: prod
+    url: https://docs-backend.docs.site/
+  tags:
+    - deploy
+    - k8s
+    - docs-cluster

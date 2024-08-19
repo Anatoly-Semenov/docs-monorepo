@@ -1,0 +1,6 @@
+export const enum BytesIn {
+	BYTE = 1,
+	KILOBYTE = BYTE * 1024,
+	MEGABYTE = KILOBYTE * KILOBYTE,
+	GIGABYTE = MEGABYTE * 1024
+}

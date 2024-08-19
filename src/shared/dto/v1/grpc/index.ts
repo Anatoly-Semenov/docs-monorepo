@@ -1,0 +1,6 @@
+export * from "./get-operators-grpc.dto"
+export * from "./upload-file-grpc.dto"
+export * from "./update-doc-grpc.dto"
+export * from "./get-forms-grpc.dto"
+export * from "./grpc-response.dto"
+export * from "./send-doc-grpc.dto"

@@ -1,0 +1,31 @@
+{
+	"compilerOptions": {
+		"module": "commonjs",
+		"target": "ES2021",
+		"outDir": "./dist",
+		"baseUrl": "./",
+
+		"forceConsistentCasingInFileNames": false,
+		"allowSyntheticDefaultImports": true,
+		"noFallthroughCasesInSwitch": false,
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
+		"strictBindCallApply": false,
+		"resolveJsonModule": true,
+		"strictNullChecks": false,
+		"removeComments": true,
+		"noImplicitAny": false,
+		"skipLibCheck": true,
+		"incremental": true,
+		"declaration": true,
+		"sourceMap": true,
+
+		"paths": {
+			"@docs/signing/*": ["src/domains/signing/*"],
+			"@docs/storing/*": ["src/domains/storing/*"],
+			"@docs/mocks/*": ["src/../test/mocks/*"],
+			"@docs/shared/*": ["src/shared/*"],
+			"@docs/common/*": ["src/common/*"]
+		}
+	}
+}

@@ -1,0 +1,21 @@
+{{- if .Values.kafka.app}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-{{ include "project.fullname" . }}-kafka
+  {{- with .Values.kafka.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.podPorts.containerPort }}
+      protocol: {{ .Values.podPorts.protocol }}
+      name: {{ .Values.podPorts.name }}
+  selector:
+    {{- include "kafka.selectorLabels" . | nindent 4 }}
+{{- end }}

@@ -1,0 +1,12 @@
+{{- if .Values.podExtraEnv -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "project.fullname" . }}-config
+  labels:
+    {{- include "project.labels" . | nindent 4 }}
+  {{- with .Values.podExtraEnv }}
+data: 
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end -}}
