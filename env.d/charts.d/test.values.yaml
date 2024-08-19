@@ -1,0 +1,237 @@
+# Default values for project.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+nameOverride: "docs-backend"
+fullnameOverride: "docs-backend"
+
+parts: "testing"
+# Project enviroment, default testing
+
+replicaCount: 1
+
+imagePullSecrets:
+  - name: harbor
+
+commonEnvFrom:
+  - configMapRef:
+      name: docs-backend-config
+  - secretRef:
+      name: docs-backend-secrets
+  - secretRef:
+      name: docs-service-redis-test
+  - secretRef:
+      name: docs-service-test-s3
+  - secretRef:
+      name: docs-backend-diadoc-test
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  {}
+# fsGroup: 2000
+
+securityContext:
+  {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+# runAsUser: 1000
+
+podExtraEnv:
+  CACHE__BASE_TTL: "10000"
+  CACHE__BASE_ITEMS_AMOUNT: "10"
+  HEALTH__REST_BASE_URL: "http://127.0.0.1:3000"
+
+  #MDM
+  MDM_URL: "http://users.mdm.ru/api/v1"
+  MDM_ORGANIZATION_PATH: "organizations"
+  MDM_COUNTERPARTIES_PATH: "partners"
+
+  #KAFKA
+  KAFKA__CLIENT_ID: "DOCS_BACKEND"
+  KAFKA__GROUP_ID: "DOCS_BACKEND"
+  KAFKA__TOPIC_NAME: "e1c-builder-organizations-01"
+
+  #DIADOC
+  DIADOC_GET_ORGANIZATIONS_INN_LIST_PATH: "GetOrganizationsByInnList"
+  DIADOC_GET_ORGANIZATIONS_INN_KPP_PATH: "GetOrganizationsByInnKpp"
+  DIADOC_GET_ORGANIZATION_FEATURES: "GetOrganizationFeatures"
+  GET_ROAMING_BOX_ID: "c14aa200ee0f46d89d832c6b33b8d786@diadoc.ru"
+  DIADOC_GET_ROAMING_OPERATORS_PATH: "GetRoamingOperators"
+  DIADOC_SEND_TEMPLATE_DOCUMENT_PATH: "PostTemplate"
+  DIADOC_PRINTING_FORMS_PATH: "GeneratePrintForm"
+  DIADOC_API_URL: "https://diadoc-api.kontur.ru"
+  DIADOC_CHECK_CAN_DELETE_PATH: "/V5/GetMessage"
+  DIADOC_ARCHIVE_PREPARE: "GenerateDocumentZip"
+  DIADOC_SEND_DOCUMENT_PATH: "/V3/PostMessage"
+  DIADOC_CHECK_STATUS_PATH: "GetDocflowEvents"
+  DIADOC_ARCHIVE_DOWNLOAD: "ShelfDownload"
+  DIADOC_URL: "https://diadoc.kontur.ru"
+  DIADOC_DELETE_DOCUMENT_PATH: "Delete"
+  DIADOC_AUTH_PATH: "V3/Authenticate"
+  DIADOC_REFRESH_TIME: "15000"
+  DIADOC_TOKEN_TTL: "82800"
+
+  #CRON
+  CRON_PERIOD_REFRESH_LISTS: "0 01 * * *"
+  CRON_PERIOD_FILE_CLEANER: "0 01 * * *"
+  CRON_STATUS_WORKING_TTL: "5242880"
+  CRON_PERIOD: "*/1 * * * *"
+
+  #Retry
+  RETRY__TIMES: "3"
+  RETRY__DELAY_MILLISECONDS: "2500"
+
+  #Limits
+  LIMIT_FILES_BY_DOCUMENT: "40"
+
+  #STORING
+  STORING__MONTHS_FILES: "6"
+  STORING__MONTHS_DOCUMENT_DRAFTS: "3"
+
+  #GRPC
+  GRPC__PROTO_PATH: "@docs/protobufs/docs/services/docs_service.proto"
+  GRPC__PACKAGE: "docs.services.docs_service"
+  GRPC__LOADER: "@docs/protobufs"
+  GRPC__IS_SECURED: "false"
+  GRPC__HOST: "0.0.0.0"
+  GRPC__PORT: "3000"
+
+podPorts:
+  # Container port running and select for service app
+  name: http
+  containerPort: 3000
+  protocol: TCP
+
+#podLivenessProbe:
+#  httpGet:
+#    path: /
+#    port: 3000
+
+#podReadinessProbe:
+#  httpGet:
+#    path: /
+#    port: 3000
+
+service:
+  #annotations:
+  #  blackbox.io/should_be_probed: "true"
+  type: ClusterIP
+  port: 3000
+
+prometheus:
+  discovery:
+    enabled: false
+
+ingress:
+  enabled: true
+  className: ""
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+  hosts:
+    - host: test-docs-backend.docs.site
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+          serviceSuffix: "rest"
+
+  tls:
+    - secretName: docs.site
+      hosts:
+        - test-docs-backend.docs.site
+
+grpc:
+  podPorts:
+    # Container port running and select for service app
+    name: grpc
+    containerPort: 3000
+    protocol: TCP
+
+  #podLivenessProbe:
+  #  httpGet:
+  #    path: /
+  #    port: 3000
+  #
+  #podReadinessProbe:
+  #  httpGet:
+  #    path: /
+  #    port: 3000
+
+  service:
+    enabled: true
+    #annotations:
+    #  blackbox.io/should_be_probed: "true"
+    type: ClusterIP
+    port: 3000
+
+ingressGrpc:
+  enabled: true
+  className: ""
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+  hosts:
+    - host: backend-grpc.test.signing.docs.site
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+          serviceSuffix: grpc
+  tls:
+    - secretName: test.signing.docs.site
+      hosts:
+        - backend-grpc.test.signing.docs.site
+
+migrations:
+  enabled: true
+  command: ["yarn", "migration:run"]
+  resources: {}
+
+kafka:
+  app: true
+  service:
+    annotations:
+
+worker:
+  app: true
+  service:
+    annotations:
+
+resources:
+  {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+#   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

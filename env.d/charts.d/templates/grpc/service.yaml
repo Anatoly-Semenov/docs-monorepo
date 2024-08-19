@@ -1,0 +1,21 @@
+{{- if .Values.grpc.service}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-{{ include "project.fullname" . }}-grpc
+  {{- with .Values.grpc.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "grpc.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.grpc.service.type }}
+  ports:
+    - port: {{ .Values.grpc.service.port }}
+      targetPort: {{ .Values.grpc.podPorts.containerPort }}
+      protocol: {{ .Values.grpc.podPorts.protocol }}
+      name: {{ .Values.grpc.podPorts.name }}
+  selector:
+    {{- include "grpc.selectorLabels" . | nindent 4 }}
+  {{- end }}

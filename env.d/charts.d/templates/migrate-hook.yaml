@@ -1,0 +1,33 @@
+{{- if .Values.migrations.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "project.fullname" . }}-migrate
+  labels:
+    {{- include "migrations.labels" . | nindent 4}}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "migrations.labels" . | nindent 8}}
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        {{- .Values.imagePullSecrets | toYaml | nindent 8 }}
+      securityContext:
+        {{- .Values.podSecurityContext | toYaml | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            {{- .Values.migrations.command | toYaml | nindent 12 }}
+          envFrom:
+            {{- .Values.commonEnvFrom | toYaml | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+{{- end -}}
